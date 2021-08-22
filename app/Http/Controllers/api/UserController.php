@@ -13,7 +13,6 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Validation\Rule;
 
 class UserController extends Controller
 {
@@ -106,5 +105,33 @@ class UserController extends Controller
             'token' => $token->plainTextToken
         ];
         return $this->successResponse('Login successful.',$data);
+    }
+
+    public function updateProfile(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'username' => 'required|min:4|max:20',
+            'password' => 'required',
+        ]);
+
+        if ($validator->fails()) {
+            return $this->validationErrors($validator);
+        }
+
+        $user = $request->user();
+        if ($user->tokenCan('server:update')) {
+            $user->fill($request->only('name', 'password'));
+            $user->save();
+            return $this->successResponse('Profile updated successfully.',['user' => $user]);
+        }
+    }
+
+    public function logout(Request $request) {
+        // Revoke the token that was used to authenticate the current request...
+        $request->user()->currentAccessToken()->delete();
+
+        $data = [];
+
+        return $this->successResponse('Logged out successfully from device.',$data);
     }
 }
