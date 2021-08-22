@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
@@ -66,5 +67,15 @@ class User extends Authenticatable
     public function role()
     {
         return $this->hasOne(UserRole::class);
+    }
+
+    public function getAvatarAttribute($value)
+    {
+        if(!empty($this->attributes['avatar'])) {
+            $avatar = public_path('avatar'.DIRECTORY_SEPARATOR.$this->attributes['avatar']);
+        } else {
+            $avatar = "https://via.placeholder.com/256X256";
+        }
+        return $this->attributes['avatar'] = $avatar;
     }
 }

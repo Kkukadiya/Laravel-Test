@@ -12,7 +12,9 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
+use Image;
 
 class UserController extends Controller
 {
@@ -20,10 +22,15 @@ class UserController extends Controller
 
     public function invite(Request $request, $email)
     {
+        if ($request->user()->role_id != 1) {
+            return $this->failedResponse('You are not authorized to perfome this operation.',[],401);
+        }
         $verificationToken = Str::random(40);
+
         $user = new User();
         $user->fill(['email' => $email, 'verification_token' => $verificationToken]);
         $user->save();
+
         $mailData = [
             'email' => $email,
             'verification_link' => route('signup', $verificationToken)
@@ -75,7 +82,7 @@ class UserController extends Controller
         $user->email_verified_at = Carbon::now();
         $user->save();
 
-        return $this->successResponse('Profile created successfully.', [$user]);
+        return $this->successResponse('Profile created successfully.', ['user' => $user]);
     }
 
     public function login(Request $request)
@@ -109,20 +116,25 @@ class UserController extends Controller
 
     public function updateProfile(Request $request)
     {
-        $validator = Validator::make($request->all(), [
-            'username' => 'required|min:4|max:20',
-            'password' => 'required',
-        ]);
-
-        if ($validator->fails()) {
-            return $this->validationErrors($validator);
+        if ($request->hasFile('avatar')) {
+            $image = $request->file('avatar');
+            $filename  = time() . '.' . $image->getClientOriginalExtension();
+            $path = public_path('avatar'.DIRECTORY_SEPARATOR.$filename);
+            Image::make($image->getRealPath())->resize(256, 256)->save($path);
         }
-
         $user = $request->user();
         if ($user->tokenCan('server:update')) {
-            $user->fill($request->only('name', 'password'));
-            $user->save();
-            return $this->successResponse('Profile updated successfully.',['user' => $user]);
+            User::where('id', $user->id)
+                ->update([
+                    'name' => !empty($request->input('name')) ? $request->input('name') : $user->name,
+                    'user_name' => !empty($request->input('user_name')) ? $request->input('user_name') : $user->user_name,
+                    'email' => !empty($request->input('email ')) ? $request->input('email') : $user->email,
+                    'avatar' => !empty($filename) ? $filename : $user->avatar,
+                ]);
+
+            $updatedUser = User::find($user->id);
+
+            return $this->successResponse('Profile updated successfully.', ['user' => $updatedUser]);
         }
     }
 

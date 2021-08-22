@@ -16,13 +16,13 @@ use App\Http\Controllers\Controller;
 */
 
 Route::group(['prefix' => 'v1', 'namespace' => 'App\Http\Controllers\api'], function() {
-    Route::get('invite/{email}', 'UserController@invite')->name('invite-user');
     Route::post('user-signup/{token}', 'UserController@userSignup')->name('signup');
     Route::get('user-verify/{code}', 'UserController@userVerify')->name('verify');
 
     Route::post('login', 'UserController@login')->name('login');
-    Route::group(['middleware' => 'auth:sanctum'], function(){
-        Route::post('profile', 'UserController@update')->name('update');
+    Route::group(['middleware' => 'auth:sanctum'], function() {
+        Route::get('invite/{email}', 'UserController@invite')->name('invite-user');
+        Route::post('profile-update', 'UserController@updateProfile')->name('update-profile');
         Route::get('logout', 'UserController@logout')->name('logout');
     });
 });
