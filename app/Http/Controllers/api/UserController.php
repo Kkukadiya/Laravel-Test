@@ -78,4 +78,33 @@ class UserController extends Controller
 
         return $this->successResponse('Profile created successfully.', [$user]);
     }
+
+    public function login(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'username' => 'required|min:4|max:20',
+            'password' => 'required',
+        ]);
+
+        if ($validator->fails()) {
+            return $this->validationErrors($validator);
+        }
+
+        $data = [];
+        $user = User::where('user_name', $request->get('username'))->first();
+        if (!$user) {
+            return $this->failedResponse('Invalid username.',$data,401);
+        }
+
+        if (!Hash::check($request->get('password'), $user->password)) {
+            return $this->failedResponse('Invalid password.',$data,401);
+        }
+        $token = $user->createToken('test-token', ['server:update']);
+
+        $data = [
+            'user' => $user,
+            'token' => $token->plainTextToken
+        ];
+        return $this->successResponse('Login successful.',$data);
+    }
 }

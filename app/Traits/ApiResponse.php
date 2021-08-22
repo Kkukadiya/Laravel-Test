@@ -38,7 +38,7 @@ trait ApiResponse
     }
 
     // custom error response
-    public function failedResponse(string $message, array $data = []): Response
+    public function failedResponse(string $message, array $data = [], int $code = 403): Response
     {
         $response = [
             'status' => false,
@@ -53,6 +53,6 @@ trait ApiResponse
 
         $response = response($response);
 
-        return $response->setStatusCode(403);
+        return $response->setStatusCode($code);
     }
 }
