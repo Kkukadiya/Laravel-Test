@@ -6,78 +6,76 @@ use App\Http\Controllers\Controller;
 use App\Mail\InviteUser;
 use App\Mail\VerifyUser;
 use App\Models\User;
+use App\Traits\ApiResponse;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 
 class UserController extends Controller
 {
+    use ApiResponse;
+
     public function invite(Request $request, $email)
     {
         $verificationToken = Str::random(40);
         $user = new User();
         $user->fill(['email' => $email, 'verification_token' => $verificationToken]);
         $user->save();
-
-        $mailData = ['verification_link' => route('signup', $verificationToken)];
+        $mailData = [
+            'email' => $email,
+            'verification_link' => route('signup', $verificationToken)
+        ];
         Mail::to($email)->send(new InviteUser($mailData));
+
+        return $this->successResponse('Invitation link has has been sent successfully.', []);
     }
 
-    public function signup(Request $request, $token)
+    public function userSignup(Request $request, $token)
     {
         $user = User::where('verification_token', $token)->first();
+
         if (!$user) {
-            return response(['message' => 'Invalid verification token'], 403);
+            return $this->failedResponse('Invalid verification token.');
         }
+
+        $validator = Validator::make($request->all(), [
+            'user_name' => 'required|min:4|max:20|unique:users',
+            'password' => 'required',
+            'name' => 'required',
+        ]);
+
+        if ($validator->fails()) {
+            return $this->validationErrors($validator);
+        }
+
         $user->fill($request->only('user_name', 'password', 'name'));
         $user->verification_code = random_int(100000, 999999);
         $user->save();
-        Mail::to($user->email)->send(new VerifyUser(['verification_code' => $user->verification_code]));
-        return response(['message' => 'A 6 digit verification code sent to your email']);
+        $mailData = [
+            'name' => $user->name,
+            'verification_code' => $user->verification_code
+        ];
+        Mail::to($user->email)->send(new VerifyUser($mailData));
+
+        return $this->successResponse('A 6 digit verification code sent to your email successfully.', []);
     }
 
-    public function verify(Request $request, $code)
+    public function userVerify(Request $request, $code)
     {
         $user = User::where('verification_code', $code)->first();
         if (!$user) {
-            return response(['message' => 'Invalid verification code'], 403);
+            return $this->failedResponse('Invalid verification code.');
         }
+
         $user->verification_code = null;
         $user->verification_token = null;
         $user->email_verified_at = Carbon::now();
         $user->save();
-        return response(['message' => 'Profile created successfully', 'data' => $user]);
-    }
 
-    public function login(Request $request)
-    {
-        $user = User::where('user_name', $request->get('user_name'))->first();
-        if (!$user) {
-            return response(['message' => 'Invalid user name'], 401);
-        }
-
-        if (!Hash::check($request->get('password'), $user->password)) {
-            return response(['message' => 'Invalid password'], 401);
-        }
-        $token = $user->createToken('test-token', ['server:update']);
-        return response(['message' => 'Login successful', 'data' => ['user' => $user, 'token' => $token->plainTextToken]]);
-    }
-
-    public function update(Request $request)
-    {
-        $user = $request->user();
-        if ($user->tokenCan('server:update')) {
-            $user->fill($request->only('name', 'password'));
-            $user->save();
-            return response(['message' => 'Profile updated successfully', 'data' => ['user' => $user]]);
-        }
-    }
-
-    public function logout(Request $request) {
-        // Revoke the token that was used to authenticate the current request...
-        $request->user()->currentAccessToken()->delete();
-        return response(['message' => 'Logged out successfully from device', 'data' => []]);
+        return $this->successResponse('Profile created successfully.', [$user]);
     }
 }
